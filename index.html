@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claims Performance Dashboard — Irish Life</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1" crossorigin="anonymous"></script>
+<style>
+:root {
+  --bg-primary:#f4f6f9;--bg-card:#ffffff;--bg-header:#1a2744;--bg-header-accent:#24385c;
+  --text-primary:#212529;--text-secondary:#6c757d;--text-on-dark:#ffffff;
+  --il-green:#00a651;--il-green-light:#e6f7ee;
+  --color-health:#4C72B0;--color-life:#DD8452;--color-income:#55A868;
+  --color-open:#e74c3c;--color-closed:#27ae60;
+  --positive:#28a745;--negative:#dc3545;--warning:#f39c12;
+  --gap:16px;--radius:10px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg-primary);color:var(--text-primary);line-height:1.5}
+.dashboard-container{max-width:1440px;margin:0 auto;padding:var(--gap)}
+.dashboard-header{background:linear-gradient(135deg,var(--bg-header) 0%,var(--bg-header-accent) 100%);color:var(--text-on-dark);padding:20px 28px;border-radius:var(--radius);margin-bottom:var(--gap);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px}
+.header-left{display:flex;align-items:center;gap:14px}
+.header-left .logo{width:40px;height:40px;background:var(--il-green);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:#fff}
+.dashboard-header h1{font-size:20px;font-weight:600}
+.dashboard-header .subtitle{font-size:12px;opacity:.65;margin-top:2px}
+.tab-nav{display:flex;gap:4px;margin-bottom:var(--gap)}
+.tab-btn{padding:10px 22px;border:none;background:var(--bg-card);color:var(--text-secondary);font-size:13px;font-weight:600;cursor:pointer;border-radius:var(--radius) var(--radius) 0 0;transition:all .2s;border-bottom:3px solid transparent}
+.tab-btn.active{color:var(--bg-header);border-bottom-color:var(--il-green);background:var(--bg-card)}
+.tab-btn:hover:not(.active){background:#e9ecf0}
+.tab-page{display:none}
+.tab-page.active{display:block}
+.filters{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.filter-group{display:flex;align-items:center;gap:6px}
+.filter-group label{font-size:11px;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:.4px}
+.filter-group select,.filter-group input[type="date"]{padding:6px 10px;border:1px solid rgba(255,255,255,.2);border-radius:5px;background:rgba(255,255,255,.1);color:var(--text-on-dark);font-size:13px;outline:none}
+.filter-group select option{background:var(--bg-header);color:#fff}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--gap);margin-bottom:var(--gap)}
+.kpi-card{background:var(--bg-card);border-radius:var(--radius);padding:20px 24px;box-shadow:0 1px 4px rgba(0,0,0,.06);border-left:4px solid var(--il-green);transition:transform .15s}
+.kpi-card:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.1)}
+.kpi-card.warn{border-left-color:var(--warning)}
+.kpi-card.danger{border-left-color:var(--negative)}
+.kpi-label{font-size:12px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.kpi-value{font-size:30px;font-weight:700;color:var(--text-primary)}
+.kpi-sub{font-size:12px;color:var(--text-secondary);margin-top:4px}
+.chart-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:var(--gap);margin-bottom:var(--gap)}
+.chart-container{background:var(--bg-card);border-radius:var(--radius);padding:20px 24px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.chart-container h3{font-size:14px;font-weight:600;color:var(--text-primary);margin-bottom:14px}
+.chart-container canvas{max-height:310px}
+.table-section{background:var(--bg-card);border-radius:var(--radius);padding:20px 24px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow-x:auto;margin-bottom:var(--gap)}
+.table-section h3{font-size:14px;font-weight:600;margin-bottom:12px}
+.data-table{width:100%;border-collapse:collapse;font-size:13px}
+.data-table thead th{text-align:left;padding:10px 12px;border-bottom:2px solid #dee2e6;color:var(--text-secondary);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;user-select:none;white-space:nowrap}
+.data-table thead th:hover{color:var(--text-primary);background:#f8f9fa}
+.data-table tbody td{padding:10px 12px;border-bottom:1px solid #f0f0f0}
+.data-table tbody tr:hover{background:#f8f9fa}
+.status-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
+.status-open{background:#fdecea;color:var(--negative)}
+.status-closed{background:var(--il-green-light);color:var(--positive)}
+.badge-red{background:#fdecea;color:var(--negative);padding:3px 8px;border-radius:12px;font-size:11px;font-weight:600}
+.badge-green{background:var(--il-green-light);color:var(--positive);padding:3px 8px;border-radius:12px;font-size:11px;font-weight:600}
+.badge-amber{background:#fff8e6;color:#856404;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:600}
+.dashboard-footer{margin-top:8px;padding:12px 0;text-align:center;font-size:11px;color:var(--text-secondary);border-top:1px solid #dee2e6}
+@media(max-width:768px){.chart-row{grid-template-columns:1fr}.kpi-row{grid-template-columns:repeat(2,1fr)}.dashboard-header{flex-direction:column;align-items:flex-start}}
+</style>
+</head>
+<body>
+<div class="dashboard-container">
+
+  <!-- HEADER -->
+  <div class="dashboard-header">
+    <div class="header-left">
+      <div class="logo">IL</div>
+      <div>
+        <h1>Claims Performance Dashboard</h1>
+        <div class="subtitle">Irish Life · Claims Operations · Live Data</div>
+      </div>
+    </div>
+    <div class="filters">
+      <div class="filter-group"><label>From</label><input type="date" id="filter-from" value="2025-01-01"></div>
+      <div class="filter-group"><label>To</label><input type="date" id="filter-to" value="2025-11-30"></div>
+      <div class="filter-group"><label>Type</label>
+        <select id="filter-type"><option value="All">All Types</option><option>Health</option><option>Life</option><option>Income</option></select>
+      </div>
+      <div class="filter-group"><label>Status</label>
+        <select id="filter-status"><option value="All">All</option><option>Open</option><option>Closed</option></select>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tab-nav">
+    <button class="tab-btn active" data-tab="overview">Overview</button>
+    <button class="tab-btn" data-tab="backlog">Backlog &amp; Ageing</button>
+    <button class="tab-btn" data-tab="performance">Team Performance</button>
+  </div>
+
+  <!-- PAGE 1: OVERVIEW -->
+  <div class="tab-page active" id="tab-overview">
+    <div class="kpi-row">
+      <div class="kpi-card"><div class="kpi-label">Total Claims</div><div class="kpi-value" id="kpi-total">—</div><div class="kpi-sub">All claim types</div></div>
+      <div class="kpi-card warn"><div class="kpi-label">Avg Processing Days</div><div class="kpi-value" id="kpi-avg-days">—</div><div class="kpi-sub">Closed claims only</div></div>
+      <div class="kpi-card danger"><div class="kpi-label">SLA Breach Rate</div><div class="kpi-value" id="kpi-sla">—</div><div class="kpi-sub">&gt;14 days to close</div></div>
+      <div class="kpi-card"><div class="kpi-label">Total Claim Value</div><div class="kpi-value" id="kpi-total-amount">—</div><div class="kpi-sub">All claims</div></div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-container"><h3>Claims by type &amp; status</h3><canvas id="chart-type-status"></canvas></div>
+      <div class="chart-container"><h3>Monthly claims trend</h3><canvas id="chart-monthly"></canvas></div>
+    </div>
+    <div class="table-section">
+      <h3>Claims detail</h3>
+      <div id="detail-table"></div>
+    </div>
+  </div>
+
+  <!-- PAGE 2: BACKLOG & AGEING -->
+  <div class="tab-page" id="tab-backlog">
+    <div class="kpi-row">
+      <div class="kpi-card danger"><div class="kpi-label">Open Claims</div><div class="kpi-value" id="kpi-open-count">—</div><div class="kpi-sub">Awaiting processing</div></div>
+      <div class="kpi-card danger"><div class="kpi-label">Financial Exposure</div><div class="kpi-value" id="kpi-exposure">—</div><div class="kpi-sub">Open claims only</div></div>
+      <div class="kpi-card warn"><div class="kpi-label">Avg Claim Age</div><div class="kpi-value" id="kpi-avg-age">—</div><div class="kpi-sub">Days open (unprocessed)</div></div>
+      <div class="kpi-card"><div class="kpi-label">Oldest Open Claim</div><div class="kpi-value" id="kpi-oldest">—</div><div class="kpi-sub">Days since submitted</div></div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-container"><h3>Open claims by type &amp; exposure</h3><canvas id="chart-open-type"></canvas></div>
+      <div class="chart-container"><h3>Avg claim age by type (days)</h3><canvas id="chart-age-type"></canvas></div>
+    </div>
+    <div class="table-section">
+      <h3>Open claims backlog — sorted by age</h3>
+      <div id="backlog-table"></div>
+    </div>
+  </div>
+
+  <!-- PAGE 3: TEAM PERFORMANCE -->
+  <div class="tab-page" id="tab-performance">
+    <div class="kpi-row">
+      <div class="kpi-card"><div class="kpi-label">Total Closed Claims</div><div class="kpi-value" id="kpi-closed">—</div><div class="kpi-sub">Within selected period</div></div>
+      <div class="kpi-card warn"><div class="kpi-label">Avg Processing Days</div><div class="kpi-value" id="kpi-perf-avg">—</div><div class="kpi-sub">Closed claims</div></div>
+      <div class="kpi-card danger"><div class="kpi-label">SLA Breach Rate</div><div class="kpi-value" id="kpi-perf-sla">—</div><div class="kpi-sub">&gt;14 day threshold</div></div>
+      <div class="kpi-card"><div class="kpi-label">Avg Claim Value</div><div class="kpi-value" id="kpi-avg-value">—</div><div class="kpi-sub">Closed claims</div></div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-container"><h3>Avg processing days by claim type</h3><canvas id="chart-proc-type"></canvas></div>
+      <div class="chart-container"><h3>SLA breach rate by claim type</h3><canvas id="chart-sla-type"></canvas></div>
+    </div>
+    <div class="table-section">
+      <h3>Performance by claim type — closed claims</h3>
+      <div id="performance-table"></div>
+    </div>
+  </div>
+
+  <div class="dashboard-footer">Claims Performance Dashboard · Irish Life · Data sourced from claims_reporting · Last refreshed: <span id="refresh-time"></span></div>
+</div>
+
+<script>
+const DATA = [
+  {CLAIM_ID:1001,CLAIMANT_NAME:"Sean Murphy",POLICY_NUMBER:"POL-10201",CLAIM_TYPE:"Health",CLAIM_AMOUNT:2500,CLAIM_DATE:"2025-01-05",PROCESSED_DATE:"2025-01-12",STATUS:"Closed",PROCESSING_DAYS:7,SLA_BREACH_FLAG:0,CLAIM_AGE_DAYS:null,AGE_BUCKET:null},
+  {CLAIM_ID:1002,CLAIMANT_NAME:"Aoife Kelly",POLICY_NUMBER:"POL-10302",CLAIM_TYPE:"Life",CLAIM_AMOUNT:15000,CLAIM_DATE:"2025-01-10",PROCESSED_DATE:"2025-02-01",STATUS:"Closed",PROCESSING_DAYS:22,SLA_BREACH_FLAG:1,CLAIM_AGE_DAYS:null,AGE_BUCKET:null},
+  {CLAIM_ID:1003,CLAIMANT_NAME:"Ciaran Byrne",POLICY_NUMBER:"POL-10415",CLAIM_TYPE:"Health",CLAIM_AMOUNT:1800,CLAIM_DATE:"2025-02-14",PROCESSED_DATE:null,STATUS:"Open",PROCESSING_DAYS:null,SLA_BREACH_FLAG:0,CLAIM_AGE_DAYS:403,AGE_BUCKET:60},
+  {CLAIM_ID:1004,CLAIMANT_NAME:"Niamh O'Brien",POLICY_NUMBER:"POL-10520",CLAIM_TYPE:"Income",CLAIM_AMOUNT:5200,CLAIM_DATE:"2025-03-01",PROCESSED_DATE:"2025-03-10",STATUS:"Closed",PROCESSING_DAYS:9,SLA_BREACH_FLAG:0,CLAIM_AGE_DAYS:null,AGE_BUCKET:null},
+  {CLAIM_ID:1005,CLAIMANT_NAME:"Padraig Walsh",POLICY_NUMBER:"POL-10633",CLAIM_TYPE:"Health",CLAIM_AMOUNT:3400,CLAIM_DATE:"2025-03-15",PROCESSED_DATE:null,STATUS:"Open",PROCESSING_DAYS:null,SLA_BREACH_FLAG:0,CLAIM_AGE_DAYS:374,AGE_BUCKET:60},
+  {CLAIM_ID:1006,CLAIMANT_NAME:"Sinead Doyle",POLICY_NUMBER:"POL-10748",CLAIM_TYPE:"Life",CLAIM_AMOUNT:45000,CLAIM_DATE:"2025-04-02",PROCESSED_DATE:"2025-04-28",STATUS:"Closed",PROCESSING_DAYS:26,SLA_BREACH_FLAG:1,CLAIM_AGE_DAYS:null,AGE_BUCKET:null},
+  {CLAIM_ID:1007,CLAIMANT_NAME:"Declan Ryan",POLICY_NUMBER:"POL-10851",CLAIM_TYPE:"Income",CLAIM_AMOUNT:6100,CLAIM_DATE:"2025-05-10",PROCESSED_DATE:null,STATUS:"Open",PROCESSING_DAYS:null,SLA_BREACH_FLAG:0,CLAIM_AGE_DAYS:318,AGE_BUCKET:60},
+  {CLAIM_ID:1008,CLAIMANT_NAME:"Orla Fitzgerald",POLICY_NUMBER:"POL-10962",CLAIM_TYPE:"Health",CLAIM_AMOUNT:1200,CLAIM_DATE:"2025-06-01",PROCESSED_DATE:"2025-06-05",STATUS:"Closed",PROCESSING_DAYS:4,SLA_BREACH_FLAG:0,CLAIM_AGE_DAYS:null,AGE_BUCKET:null},
+  {CLAIM_ID:1009,CLAIMANT_NAME:"Liam Gallagher",POLICY_NUMBER:"POL-11075",CLAIM_TYPE:"Life",CLAIM_AMOUNT:22000,CLAIM_DATE:"2025-06-20",PROCESSED_DATE:null,STATUS:"Open",PROCESSING_DAYS:null,SLA_BREACH_FLAG:0,CLAIM_AGE_DAYS:277,AGE_BUCKET:60},
+  {CLAIM_ID:1010,CLAIMANT_NAME:"Roisin McCarthy",POLICY_NUMBER:"POL-11180",CLAIM_TYPE:"Health",CLAIM_AMOUNT:4700,CLAIM_DATE:"2025-07-05",PROCESSED_DATE:"2025-07-25",STATUS:"Closed",PROCESSING_DAYS:20,SLA_BREACH_FLAG:1,CLAIM_AGE_DAYS:null,AGE_BUCKET:null},
+  {CLAIM_ID:1011,CLAIMANT_NAME:"Eoin Kavanagh",POLICY_NUMBER:"POL-11293",CLAIM_TYPE:"Income",CLAIM_AMOUNT:3800,CLAIM_DATE:"2025-08-12",PROCESSED_DATE:"2025-08-15",STATUS:"Closed",PROCESSING_DAYS:3,SLA_BREACH_FLAG:0,CLAIM_AGE_DAYS:null,AGE_BUCKET:null},
+  {CLAIM_ID:1012,CLAIMANT_NAME:"Maeve Collins",POLICY_NUMBER:"POL-11400",CLAIM_TYPE:"Health",CLAIM_AMOUNT:2900,CLAIM_DATE:"2025-09-01",PROCESSED_DATE:null,STATUS:"Open",PROCESSING_DAYS:null,SLA_BREACH_FLAG:0,CLAIM_AGE_DAYS:204,AGE_BUCKET:60},
+  {CLAIM_ID:1013,CLAIMANT_NAME:"Conor Daly",POLICY_NUMBER:"POL-11518",CLAIM_TYPE:"Life",CLAIM_AMOUNT:18000,CLAIM_DATE:"2025-09-20",PROCESSED_DATE:"2025-10-20",STATUS:"Closed",PROCESSING_DAYS:30,SLA_BREACH_FLAG:1,CLAIM_AGE_DAYS:null,AGE_BUCKET:null},
+  {CLAIM_ID:1014,CLAIMANT_NAME:"Aisling Nolan",POLICY_NUMBER:"POL-11625",CLAIM_TYPE:"Health",CLAIM_AMOUNT:1500,CLAIM_DATE:"2025-10-05",PROCESSED_DATE:null,STATUS:"Open",PROCESSING_DAYS:null,SLA_BREACH_FLAG:0,CLAIM_AGE_DAYS:170,AGE_BUCKET:60},
+  {CLAIM_ID:1015,CLAIMANT_NAME:"Darragh Healy",POLICY_NUMBER:"POL-11730",CLAIM_TYPE:"Income",CLAIM_AMOUNT:7600,CLAIM_DATE:"2025-11-01",PROCESSED_DATE:"2025-11-03",STATUS:"Closed",PROCESSING_DAYS:2,SLA_BREACH_FLAG:0,CLAIM_AGE_DAYS:null,AGE_BUCKET:null}
+];
+
+const COLORS = {Health:'#4C72B0',Life:'#DD8452',Income:'#55A868'};
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+let charts = {};
+let filtered = [...DATA];
+
+function fmt(n){return n!=null?n.toLocaleString('en-IE'):'—'}
+function fmtEur(n){return n!=null?'€'+n.toLocaleString('en-IE',{minimumFractionDigits:0}):'—'}
+function fmtPct(n){return n!=null?(n*100).toFixed(1)+'%':'—'}
+
+function getFiltered(){
+  const from = document.getElementById('filter-from').value;
+  const to = document.getElementById('filter-to').value;
+  const type = document.getElementById('filter-type').value;
+  const status = document.getElementById('filter-status').value;
+  return DATA.filter(r=>{
+    if(from && r.CLAIM_DATE < from) return false;
+    if(to && r.CLAIM_DATE > to) return false;
+    if(type !== 'All' && r.CLAIM_TYPE !== type) return false;
+    if(status !== 'All' && r.STATUS !== status) return false;
+    return true;
+  });
+}
+
+function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+
+function renderOverview(data){
+  const closed = data.filter(r=>r.STATUS==='Closed');
+  const totalClaims = data.length;
+  const avgDays = closed.length ? (closed.reduce((s,r)=>s+(r.PROCESSING_DAYS||0),0)/closed.length).toFixed(1) : '—';
+  const slaRate = closed.length ? fmtPct(closed.filter(r=>r.SLA_BREACH_FLAG===1).length/closed.length) : '—';
+  const totalAmt = data.reduce((s,r)=>s+r.CLAIM_AMOUNT,0);
+
+  document.getElementById('kpi-total').textContent = fmt(totalClaims);
+  document.getElementById('kpi-avg-days').textContent = avgDays === '—' ? '—' : avgDays+'d';
+  document.getElementById('kpi-sla').textContent = slaRate;
+  document.getElementById('kpi-total-amount').textContent = fmtEur(totalAmt);
+
+  // Chart: type + status
+  destroyChart('typeStatus');
+  const types = ['Health','Income','Life'];
+  const openCounts = types.map(t=>data.filter(r=>r.CLAIM_TYPE===t&&r.STATUS==='Open').length);
+  const closedCounts = types.map(t=>data.filter(r=>r.CLAIM_TYPE===t&&r.STATUS==='Closed').length);
+  charts.typeStatus = new Chart(document.getElementById('chart-type-status').getContext('2d'),{
+    type:'bar',
+    data:{labels:types,datasets:[
+      {label:'Open',data:openCounts,backgroundColor:'#e74c3cCC',borderColor:'#e74c3c',borderWidth:1,borderRadius:4},
+      {label:'Closed',data:closedCounts,backgroundColor:'#27ae60CC',borderColor:'#27ae60',borderWidth:1,borderRadius:4}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      plugins:{legend:{position:'top',labels:{usePointStyle:true,padding:16}},
+        tooltip:{callbacks:{label:ctx=>`${ctx.parsed.x} claims`}}},
+      scales:{x:{beginAtZero:true,stacked:false,ticks:{stepSize:1}},y:{grid:{display:false}}}}
+  });
+
+  // Chart: monthly trend
+  destroyChart('monthly');
+  const monthMap = {};
+  data.forEach(r=>{
+    const m = parseInt(r.CLAIM_DATE.split('-')[1])-1;
+    monthMap[m] = (monthMap[m]||0)+1;
+  });
+  const labels = [], counts = [];
+  for(let i=0;i<12;i++){if(monthMap[i]!=null){labels.push(MONTHS[i]);counts.push(monthMap[i]);}}
+  charts.monthly = new Chart(document.getElementById('chart-monthly').getContext('2d'),{
+    type:'line',
+    data:{labels,datasets:[{label:'Claims',data:counts,borderColor:'#4C72B0',backgroundColor:'rgba(76,114,176,0.08)',borderWidth:2,pointRadius:5,pointBackgroundColor:'#4C72B0',tension:0.3,fill:true}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.parsed.y} claims`}}},
+      scales:{x:{grid:{display:false}},y:{beginAtZero:true,ticks:{stepSize:1}}}}
+  });
+
+  // Detail table
+  renderSortableTable('detail-table', data, [
+    {field:'CLAIM_ID',label:'Claim ID'},
+    {field:'CLAIMANT_NAME',label:'Claimant'},
+    {field:'CLAIM_TYPE',label:'Type'},
+    {field:'CLAIM_AMOUNT',label:'Amount',fmt:'eur'},
+    {field:'CLAIM_DATE',label:'Claim Date'},
+    {field:'STATUS',label:'Status',fmt:'status'},
+    {field:'PROCESSING_DAYS',label:'Days',fmt:'days'},
+    {field:'SLA_BREACH_FLAG',label:'SLA Breach',fmt:'flag'}
+  ]);
+}
+
+function renderBacklog(data){
+  const open = data.filter(r=>r.STATUS==='Open');
+  const openCount = open.length;
+  const exposure = open.reduce((s,r)=>s+r.CLAIM_AMOUNT,0);
+  const ages = open.filter(r=>r.CLAIM_AGE_DAYS!=null).map(r=>r.CLAIM_AGE_DAYS);
+  const avgAge = ages.length ? Math.round(ages.reduce((a,b)=>a+b,0)/ages.length) : 0;
+  const oldest = ages.length ? Math.max(...ages) : 0;
+
+  document.getElementById('kpi-open-count').textContent = fmt(openCount);
+  document.getElementById('kpi-exposure').textContent = fmtEur(exposure);
+  document.getElementById('kpi-avg-age').textContent = avgAge+'d';
+  document.getElementById('kpi-oldest').textContent = oldest+'d';
+
+  const types = [...new Set(open.map(d=>d.CLAIM_TYPE))].sort();
+
+  // Chart: open by type + exposure
+  destroyChart('openType');
+  const typeCounts = types.map(t=>open.filter(r=>r.CLAIM_TYPE===t).length);
+  const typeAmounts = types.map(t=>open.filter(r=>r.CLAIM_TYPE===t).reduce((s,r)=>s+r.CLAIM_AMOUNT,0));
+  charts.openType = new Chart(document.getElementById('chart-open-type').getContext('2d'),{
+    type:'bar',
+    data:{labels:types,datasets:[
+      {label:'Open Count',data:typeCounts,backgroundColor:types.map(t=>(COLORS[t]||'#999')+'CC'),borderColor:types.map(t=>COLORS[t]||'#999'),borderWidth:1,borderRadius:4,yAxisID:'y'},
+      {label:'Exposure (€)',data:typeAmounts,type:'line',borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,.1)',borderWidth:2,pointRadius:5,yAxisID:'y1'}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{usePointStyle:true,padding:16}},
+        tooltip:{callbacks:{label:ctx=>ctx.dataset.label==='Open Count'?`${ctx.parsed.y} claims`:`€${ctx.parsed.y.toLocaleString()}`}}},
+      scales:{x:{grid:{display:false}},
+        y:{beginAtZero:true,position:'left',title:{display:true,text:'Count'},ticks:{stepSize:1}},
+        y1:{beginAtZero:true,position:'right',title:{display:true,text:'Exposure (€)'},grid:{drawOnChartArea:false},ticks:{callback:v=>'€'+(v>=1e3?(v/1e3).toFixed(0)+'K':v)}}
+      }}
+  });
+
+  // Chart: avg age by type
+  destroyChart('ageType');
+  const avgAges = types.map(t=>{
+    const a=open.filter(r=>r.CLAIM_TYPE===t&&r.CLAIM_AGE_DAYS!=null).map(r=>r.CLAIM_AGE_DAYS);
+    return a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):0;
+  });
+  charts.ageType = new Chart(document.getElementById('chart-age-type').getContext('2d'),{
+    type:'bar',
+    data:{labels:types,datasets:[{label:'Avg Age (days)',data:avgAges,backgroundColor:types.map(t=>(COLORS[t]||'#999')+'CC'),borderColor:types.map(t=>COLORS[t]||'#999'),borderWidth:1,borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.parsed.x} days`}}},
+      scales:{x:{beginAtZero:true,title:{display:true,text:'Days'}},y:{grid:{display:false}}}}
+  });
+
+  // Backlog table
+  const rows = types.map(t=>{
+    const s=open.filter(r=>r.CLAIM_TYPE===t);
+    const a=s.filter(r=>r.CLAIM_AGE_DAYS!=null).map(r=>r.CLAIM_AGE_DAYS);
+    return{CLAIM_TYPE:t,OPEN_COUNT:s.length,EXPOSURE:s.reduce((x,r)=>x+r.CLAIM_AMOUNT,0),AVG_AGE:a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):0,MAX_AGE:a.length?Math.max(...a):0};
+  }).sort((a,b)=>b.AVG_AGE-a.AVG_AGE);
+
+  renderSortableTable('backlog-table', rows, [
+    {field:'CLAIM_TYPE',label:'Claim Type'},
+    {field:'OPEN_COUNT',label:'Open Claims'},
+    {field:'EXPOSURE',label:'Financial Exposure',fmt:'eur'},
+    {field:'AVG_AGE',label:'Avg Age (days)'},
+    {field:'MAX_AGE',label:'Oldest Claim (days)'}
+  ]);
+}
+
+function renderPerformance(data){
+  const closed = data.filter(r=>r.STATUS==='Closed');
+  const avgDays = closed.length?(closed.reduce((s,r)=>s+(r.PROCESSING_DAYS||0),0)/closed.length).toFixed(1):'—';
+  const slaRate = closed.length?fmtPct(closed.filter(r=>r.SLA_BREACH_FLAG===1).length/closed.length):'—';
+  const avgVal = closed.length?Math.round(closed.reduce((s,r)=>s+r.CLAIM_AMOUNT,0)/closed.length):0;
+
+  document.getElementById('kpi-closed').textContent = fmt(closed.length);
+  document.getElementById('kpi-perf-avg').textContent = avgDays==='—'?'—':avgDays+'d';
+  document.getElementById('kpi-perf-sla').textContent = slaRate;
+  document.getElementById('kpi-avg-value').textContent = fmtEur(avgVal);
+
+  const types = ['Health','Income','Life'];
+  const typeAvgDays = types.map(t=>{
+    const s=closed.filter(r=>r.CLAIM_TYPE===t);
+    return s.length?parseFloat((s.reduce((x,r)=>x+(r.PROCESSING_DAYS||0),0)/s.length).toFixed(1)):0;
+  });
+  const typeSlaRate = types.map(t=>{
+    const s=closed.filter(r=>r.CLAIM_TYPE===t);
+    return s.length?parseFloat(((s.filter(r=>r.SLA_BREACH_FLAG===1).length/s.length)*100).toFixed(1)):0;
+  });
+
+  // Chart: avg processing days by type
+  destroyChart('procType');
+  charts.procType = new Chart(document.getElementById('chart-proc-type').getContext('2d'),{
+    type:'bar',
+    data:{labels:types,datasets:[{label:'Avg Processing Days',data:typeAvgDays,backgroundColor:types.map(t=>(COLORS[t]||'#999')+'CC'),borderColor:types.map(t=>COLORS[t]||'#999'),borderWidth:1,borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.parsed.y} days`}}},
+      scales:{x:{grid:{display:false}},y:{beginAtZero:true,title:{display:true,text:'Days'}}}}
+  });
+
+  // Chart: SLA breach rate by type
+  destroyChart('slaType');
+  charts.slaType = new Chart(document.getElementById('chart-sla-type').getContext('2d'),{
+    type:'bar',
+    data:{labels:types,datasets:[{label:'SLA Breach Rate %',data:typeSlaRate,backgroundColor:typeSlaRate.map(v=>v>50?'rgba(220,53,69,0.75)':v>30?'rgba(243,156,18,0.75)':'rgba(40,167,69,0.75)'),borderColor:typeSlaRate.map(v=>v>50?'#dc3545':v>30?'#f39c12':'#28a745'),borderWidth:1,borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.parsed.y}%`}}},
+      scales:{x:{grid:{display:false}},y:{beginAtZero:true,max:100,title:{display:true,text:'%'},ticks:{callback:v=>v+'%'}}}}
+  });
+
+  // Performance matrix table
+  const rows = types.map(t=>{
+    const s=closed.filter(r=>r.CLAIM_TYPE===t);
+    const breaches=s.filter(r=>r.SLA_BREACH_FLAG===1).length;
+    const ad=s.length?parseFloat((s.reduce((x,r)=>x+(r.PROCESSING_DAYS||0),0)/s.length).toFixed(1)):0;
+    const br=s.length?parseFloat(((breaches/s.length)*100).toFixed(1)):0;
+    return{CLAIM_TYPE:t,TOTAL:s.length,AVG_DAYS:ad,BREACHES:breaches,BREACH_RATE:br,AVG_VALUE:s.length?Math.round(s.reduce((x,r)=>x+r.CLAIM_AMOUNT,0)/s.length):0};
+  });
+
+  renderSortableTable('performance-table', rows, [
+    {field:'CLAIM_TYPE',label:'Claim Type'},
+    {field:'TOTAL',label:'Total Closed'},
+    {field:'AVG_DAYS',label:'Avg Days'},
+    {field:'BREACHES',label:'SLA Breaches'},
+    {field:'BREACH_RATE',label:'Breach Rate %',fmt:'pct-badge'},
+    {field:'AVG_VALUE',label:'Avg Claim Value',fmt:'eur'}
+  ]);
+}
+
+function renderSortableTable(containerId, data, columns){
+  const container = document.getElementById(containerId);
+  let sortCol=null, sortDir='desc';
+  const render = (d)=>{
+    let html='<table class="data-table"><thead><tr>';
+    columns.forEach(col=>{
+      const arrow=sortCol===col.field?(sortDir==='asc'?' ▲':' ▼'):'';
+      html+=`<th data-field="${col.field}">${col.label}${arrow}</th>`;
+    });
+    html+='</tr></thead><tbody>';
+    d.forEach(row=>{
+      html+='<tr>';
+      columns.forEach(col=>{
+        let val=row[col.field];
+        if(col.fmt==='eur') val=val!=null?'€'+val.toLocaleString('en-IE',{minimumFractionDigits:0}):'—';
+        else if(col.fmt==='status') val=`<span class="status-badge status-${(val||'').toLowerCase()}">${val||'—'}</span>`;
+        else if(col.fmt==='flag') val=val===1?'<span class="badge-red">Yes</span>':'<span class="badge-green">No</span>';
+        else if(col.fmt==='days') val=val!=null?val+'d':'—';
+        else if(col.fmt==='pct-badge'){
+          const cls=val>50?'badge-red':val>30?'badge-amber':'badge-green';
+          val=`<span class="${cls}">${val}%</span>`;
+        }
+        else val=val!=null?val:'—';
+        html+=`<td>${val}</td>`;
+      });
+      html+='</tr>';
+    });
+    html+='</tbody></table>';
+    container.innerHTML=html;
+    container.querySelectorAll('th').forEach(th=>{
+      th.addEventListener('click',()=>{
+        const f=th.dataset.field;
+        if(sortCol===f) sortDir=sortDir==='asc'?'desc':'asc';
+        else{sortCol=f;sortDir='desc';}
+        const sorted=[...d].sort((a,b)=>{
+          const av=a[f],bv=b[f];
+          const cmp=av<bv?-1:av>bv?1:0;
+          return sortDir==='asc'?cmp:-cmp;
+        });
+        render(sorted);
+      });
+    });
+  };
+  render(data);
+}
+
+function refresh(){
+  filtered = getFiltered();
+  renderOverview(filtered);
+  renderBacklog(filtered);
+  renderPerformance(filtered);
+}
+
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-page').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+// Filter listeners
+['filter-from','filter-to','filter-type','filter-status'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', refresh);
+});
+
+// Footer timestamp
+document.getElementById('refresh-time').textContent = new Date().toLocaleString('en-IE');
+
+// Init
+refresh();
+</script>
+</body>
+</html>
